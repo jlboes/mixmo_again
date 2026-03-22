@@ -1,5 +1,19 @@
 # MIXMO MVP
 
+
+Just do
+```
+docker-compose up --build
+```
+
+or
+
+```
+docker-compose up -d --build
+```
+
+---
+
 MIXMO is a full-stack multiplayer word-game MVP built from the repository handoff documents. The project delivers:
 
 - Spring Boot 3 backend with authoritative room/game rules
