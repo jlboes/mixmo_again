@@ -1,0 +1,104 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: mixmo
+      POSTGRES_USER: mixmo
+      POSTGRES_PASSWORD: mixmo
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mixmo -d mixmo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    image: maven:3.9.9-eclipse-temurin-21
+    working_dir: /app
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mixmo
+      SPRING_DATASOURCE_USERNAME: mixmo
+      SPRING_DATASOURCE_PASSWORD: mixmo
+      MIXMO_DEBUG_DEMO_ROOM_ENABLED: "true"
+      MIXMO_VALIDATOR_BASE_URL: http://python-api:8000
+      MIXMO_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:5174,http://localhost:4173,http://frontend:5173,http://frontend-browser:5174
+    command: mvn spring-boot:run
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+      - maven-repo:/root/.m2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      python-api:
+        condition: service_started
+
+  python-api:
+    build:
+      context: ./python_api
+    working_dir: /app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./python_api/app:/app/app
+      - ./python_api/data:/app/data
+
+  frontend:
+    image: node:23-alpine
+    working_dir: /app
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_API_BASE_URL: http://localhost:8080
+      VITE_WS_BASE_URL: ws://localhost:8080/ws
+      VITE_DEBUG_DEMO_ROOM: "true"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      - backend
+
+  frontend-browser:
+    profiles:
+      - browser
+    image: node:23-alpine
+    working_dir: /app
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_API_BASE_URL: http://backend:8080
+      VITE_WS_BASE_URL: ws://backend:8080/ws
+      VITE_DEBUG_DEMO_ROOM: "true"
+      MIXMO_DEV_ALLOWED_HOST: frontend-browser
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5174"
+    ports:
+      - "5174:5174"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      - backend
+
+  playwright:
+    profiles:
+      - browser
+    build:
+      context: .
+      dockerfile: docker/browser-playwright/Dockerfile
+    init: true
+    ipc: host
+    ports:
+      - "3000:3000"
+    depends_on:
+      - frontend-browser
+
+volumes:
+  postgres-data:
+  maven-repo:
+  frontend-node-modules:

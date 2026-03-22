@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mixmo
+      POSTGRES_USER: mixmo
+      POSTGRES_PASSWORD: mixmo
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mixmo -d mixmo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mixmo
+      SPRING_DATASOURCE_USERNAME: mixmo
+      SPRING_DATASOURCE_PASSWORD: mixmo
+      MIXMO_VALIDATOR_BASE_URL: http://python-api:8000
+      MIXMO_CORS_ALLOWED_ORIGINS: https://mixmo.home.arpa,http://mixmo.home.arpa
+    depends_on:
+      postgres:
+        condition: service_healthy
+      python-api:
+        condition: service_started
+    networks:
+      - default
+      - caddy
+
+  python-api:
+    build:
+      context: ./python_api
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: https://mixmo.home.arpa
+        VITE_WS_BASE_URL: wss://mixmo.home.arpa/ws
+        VITE_DEBUG_DEMO_ROOM: "true"
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - default
+      - caddy
+    labels:
+      caddy: mixmo.home.arpa
+      caddy.tls: internal
+      caddy.reverse_proxy_0: /api/* backend:8080
+      caddy.reverse_proxy_1: /ws* backend:8080
+      caddy.reverse_proxy_2: "{{upstreams 4173}}"
+      caddy.header.Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+      caddy.header.X-Content-Type-Options: "nosniff"
+      caddy.header.Referrer-Policy: "same-origin"
+
+volumes:
+  postgres-data:
+
+networks:
+  caddy:
+    external: true
+    name: caddy

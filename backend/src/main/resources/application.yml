@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: mixmo-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mixmo}
+    username: ${SPRING_DATASOURCE_USERNAME:mixmo}
+    password: ${SPRING_DATASOURCE_PASSWORD:mixmo}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: true
+  flyway:
+    enabled: true
+server:
+  port: 8080
+
+mixmo:
+  cors:
+    allowed-origins: ${MIXMO_CORS_ALLOWED_ORIGINS:http://localhost:5173, http://localhost:5174,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173}
+  stale:
+    warning-delay: ${MIXMO_STALE_WARNING_DELAY:90s}
+    auto-delay: ${MIXMO_STALE_AUTO_DELAY:30s}
+    poll-interval: ${MIXMO_STALE_POLL_INTERVAL:1s}
+  validator:
+    base-url: ${MIXMO_VALIDATOR_BASE_URL:http://localhost:8000}
+    timeout: ${MIXMO_VALIDATOR_TIMEOUT:1500ms}
+  grid-validation:
+    min-word-length: ${MIXMO_GRID_VALIDATION_MIN_WORD_LENGTH:2}
+  debug:
+    demo-room:
+      enabled: true
